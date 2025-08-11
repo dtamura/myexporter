@@ -1,4 +1,4 @@
-module github.com/dtamura/my-exporter
+module github.com/dtamura/myexporter
 
 go 1.23.0
 

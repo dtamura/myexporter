@@ -1,6 +1,6 @@
-// Package mylogexporter provides a custom OpenTelemetry Collector exporter
+// Package myexporter provides a custom OpenTelemetry Collector exporter
 // that logs received telemetry data similar to the debug exporter.
-package mylogexporter
+package myexporter
 
 import (
 	"context"
@@ -107,7 +107,7 @@ func (e *myLogExporter) Capabilities() consumer.Capabilities {
 func (e *myLogExporter) ConsumeTraces(ctx context.Context, td ptrace.Traces) error {
 	resourceSpans := td.ResourceSpans()
 	totalSpans := 0
-	
+
 	for i := 0; i < resourceSpans.Len(); i++ {
 		rs := resourceSpans.At(i)
 		scopeSpans := rs.ScopeSpans()
@@ -115,7 +115,7 @@ func (e *myLogExporter) ConsumeTraces(ctx context.Context, td ptrace.Traces) err
 			ss := scopeSpans.At(j)
 			spans := ss.Spans()
 			totalSpans += spans.Len()
-			
+
 			if e.config.Detailed {
 				for k := 0; k < spans.Len(); k++ {
 					span := spans.At(k)
@@ -130,12 +130,12 @@ func (e *myLogExporter) ConsumeTraces(ctx context.Context, td ptrace.Traces) err
 			}
 		}
 	}
-	
+
 	e.logger.Info(fmt.Sprintf("%s Traces processed", e.config.Prefix),
 		zap.Int("resource_spans", resourceSpans.Len()),
 		zap.Int("total_spans", totalSpans),
 	)
-	
+
 	return nil
 }
 
@@ -143,7 +143,7 @@ func (e *myLogExporter) ConsumeTraces(ctx context.Context, td ptrace.Traces) err
 func (e *myLogExporter) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
 	resourceMetrics := md.ResourceMetrics()
 	totalMetrics := 0
-	
+
 	for i := 0; i < resourceMetrics.Len(); i++ {
 		rm := resourceMetrics.At(i)
 		scopeMetrics := rm.ScopeMetrics()
@@ -151,7 +151,7 @@ func (e *myLogExporter) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) 
 			sm := scopeMetrics.At(j)
 			metrics := sm.Metrics()
 			totalMetrics += metrics.Len()
-			
+
 			if e.config.Detailed {
 				for k := 0; k < metrics.Len(); k++ {
 					metric := metrics.At(k)
@@ -165,12 +165,12 @@ func (e *myLogExporter) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) 
 			}
 		}
 	}
-	
+
 	e.logger.Info(fmt.Sprintf("%s Metrics processed", e.config.Prefix),
 		zap.Int("resource_metrics", resourceMetrics.Len()),
 		zap.Int("total_metrics", totalMetrics),
 	)
-	
+
 	return nil
 }
 
@@ -178,7 +178,7 @@ func (e *myLogExporter) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) 
 func (e *myLogExporter) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 	resourceLogs := ld.ResourceLogs()
 	totalLogs := 0
-	
+
 	for i := 0; i < resourceLogs.Len(); i++ {
 		rl := resourceLogs.At(i)
 		scopeLogs := rl.ScopeLogs()
@@ -186,7 +186,7 @@ func (e *myLogExporter) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 			sl := scopeLogs.At(j)
 			logRecords := sl.LogRecords()
 			totalLogs += logRecords.Len()
-			
+
 			if e.config.Detailed {
 				for k := 0; k < logRecords.Len(); k++ {
 					logRecord := logRecords.At(k)
@@ -199,11 +199,11 @@ func (e *myLogExporter) ConsumeLogs(ctx context.Context, ld plog.Logs) error {
 			}
 		}
 	}
-	
+
 	e.logger.Info(fmt.Sprintf("%s Logs processed", e.config.Prefix),
 		zap.Int("resource_logs", resourceLogs.Len()),
 		zap.Int("total_logs", totalLogs),
 	)
-	
+
 	return nil
 }
