@@ -46,15 +46,22 @@ func (e *logsExporter) Capabilities() consumer.Capabilities {
 }
 
 // start はエクスポーター開始時に呼び出されます
-// DB接続テストのみ実行、テーブル作成は行わない
+// DB接続テストとデータベース作成を実行（テーブル作成は行わない）
 func (e *logsExporter) start(ctx context.Context, host component.Host) error {
 	e.logger.Info("ログエクスポーターを開始しています",
 		zap.String("prefix", e.config.Prefix),
 		zap.Bool("db_enabled", e.db != nil),
 	)
 
-	// DB接続が有効な場合、接続テストのみ実行
+	// DB接続が有効な場合、データベース作成と接続テストを実行
 	if e.db != nil {
+		// 1. データベース作成（テーブル作成は無し）
+		if err := createDatabase(ctx, e.config, e.logger); err != nil {
+			e.logger.Error("データベース作成に失敗しました", zap.Error(err))
+			return err
+		}
+
+		// 2. 接続テスト
 		if err := e.db.Ping(); err != nil {
 			e.logger.Error("データベースへの接続テストに失敗しました", zap.Error(err))
 			return err
