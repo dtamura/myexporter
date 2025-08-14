@@ -4,17 +4,20 @@
 package myexporter
 
 import (
+	"time"
+
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configopaque"
+	"go.opentelemetry.io/collector/config/configretry"
 	"go.opentelemetry.io/collector/exporter/exporterhelper"
 )
 
 // Config は my-log エクスポーターの設定を定義します。
 type Config struct {
-	// exporterhelper標準設定
-	exporterhelper.TimeoutSettings `mapstructure:",squash"`
-	exporterhelper.RetrySettings   `mapstructure:"retry_on_failure"`
-	exporterhelper.QueueSettings   `mapstructure:"sending_queue"`
+	// エクスポーター標準設定
+	Timeout time.Duration                   `mapstructure:"timeout"`
+	Retry   configretry.BackOffConfig       `mapstructure:"retry_on_failure"`
+	Queue   exporterhelper.QueueBatchConfig `mapstructure:"sending_queue"`
 
 	// 既存の設定
 	Prefix   string `mapstructure:"prefix"`
@@ -30,14 +33,10 @@ type Config struct {
 }
 
 func createDefaultConfig() component.Config {
-	// clickhouseexporterと同様の標準設定を適用
-	queueSettings := exporterhelper.NewDefaultQueueSettings()
-	queueSettings.NumConsumers = 1
-
 	return &Config{
-		TimeoutSettings:  exporterhelper.NewDefaultTimeoutSettings(),
-		QueueSettings:    queueSettings,
-		RetrySettings:    exporterhelper.NewDefaultRetrySettings(),
+		Timeout:          5 * time.Second,
+		Retry:            configretry.NewDefaultBackOffConfig(),
+		Queue:            exporterhelper.QueueBatchConfig{Enabled: false},
 		Prefix:           "[MyLogExporter]",
 		Detailed:         false,
 		Database:         "default",   // ClickHouseのデフォルトデータベース
