@@ -37,7 +37,9 @@ type Config struct {
 	Compress        string        `mapstructure:"compress"`          // 圧縮アルゴリズム
 	AsyncInsert     bool          `mapstructure:"async_insert"`      // 非同期挿入
 	TTL             time.Duration `mapstructure:"ttl"`               // データ保持期間
+	TTLDays         int           `mapstructure:"ttl_days"`          // データ保持期間（日数）
 	TracesTableName string        `mapstructure:"traces_table_name"` // トレーステーブル名
+	LogsTableName   string        `mapstructure:"logs_table_name"`   // ログテーブル名
 	TableEngine     string        `mapstructure:"table_engine"`      // ClickHouseテーブルエンジン
 	ClusterName     string        `mapstructure:"cluster_name"`      // ClickHouseクラスタ名
 }
@@ -52,6 +54,7 @@ func createDefaultConfig() component.Config {
 		Database:         "otel",        // 独自のデータベース名
 		TableName:        "otel_logs",   // ClickHouseらしいテーブル名
 		TracesTableName:  "otel_traces", // トレーステーブル名
+		LogsTableName:    "otel_logs",   // ログテーブル名
 		ConnectionParams: map[string]string{},
 		CreateSchema:     true,        // デフォルトでスキーマ作成を有効
 		Compress:         "lz4",       // clickhouseexporterと同様のデフォルト圧縮

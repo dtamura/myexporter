@@ -4,9 +4,15 @@
 package internal
 
 import (
+	"embed"
 	"fmt"
 	"time"
 )
+
+// SQL templates embedded at compile time for better distribution
+//
+//go:embed sqltemplates/*.sql
+var sqlTemplates embed.FS
 
 const DefaultDatabase = "default"
 
@@ -26,4 +32,14 @@ func GenerateTTLExpr(ttl time.Duration, timeField string) string {
 	}
 
 	return ""
+}
+
+// LoadSQLTemplate は組み込みファイルシステムからSQLテンプレートを読み込みます
+func LoadSQLTemplate(filename string) (string, error) {
+	path := fmt.Sprintf("sqltemplates/%s", filename)
+	data, err := sqlTemplates.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("SQLテンプレート %s の読み込みに失敗しました: %w", path, err)
+	}
+	return string(data), nil
 }
