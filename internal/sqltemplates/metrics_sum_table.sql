@@ -1,7 +1,7 @@
--- ClickHouse Metrics Sum Table Schema for OpenTelemetry Data
--- This table stores sum/counter metric data points (cumulative or delta measurements)
--- Sum metrics represent values that accumulate over time (request count, bytes transferred, errors, etc.)
--- Based on OpenTelemetry metrics data model: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
+-- OpenTelemetryデータのためのClickHouse Metrics Sumテーブル スキーマ
+-- このテーブルはSum/Counterメトリクス データポイント（累積またはデルタ測定値）を保存します
+-- Sumメトリクスは時間とともに蓄積される値を表します（リクエスト数、転送バイト数、エラーなど）
+-- OpenTelemetryメトリクス データモデルに基づく: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
 
 CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
     -- ===== RESOURCE IDENTIFICATION =====

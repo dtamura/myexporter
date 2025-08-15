@@ -1,34 +1,34 @@
--- ClickHouse Metrics Histogram Table Schema for OpenTelemetry Data
--- This table stores histogram metric data points (distribution measurements)
--- Histograms represent the distribution of values over predefined buckets (latency, response size, etc.)
--- Based on OpenTelemetry metrics data model: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
+-- OpenTelemetryデータのためのClickHouse Metrics Histogramテーブル スキーマ
+-- このテーブルはHistogramメトリクス データポイント（分布測定値）を保存します
+-- Histogramは事前定義されたバケットでの値の分布を表します（レイテンシー、レスポンスサイズなど）
+-- OpenTelemetryメトリクス データモデルに基づく: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
 
 CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
-    -- ===== RESOURCE IDENTIFICATION =====
-    -- Metadata about the resource (service, host, container) emitting metrics
+    -- ===== リソース識別 =====
+    -- メトリクスを発行するリソース（サービス、ホスト、コンテナ）に関するメタデータ
     ResourceAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Resource metadata: service.name, host.name, k8s.pod.name
-                                                                  -- Map type enables flexible querying of resource properties
-    ResourceSchemaUrl String CODEC(ZSTD(1)),                    -- Schema version URL for resource attributes
+                                                                  -- リソースメタデータ: service.name, host.name, k8s.pod.name
+                                                                  -- Map型によりリソースプロパティの柔軟なクエリが可能
+    ResourceSchemaUrl String CODEC(ZSTD(1)),                    -- リソース属性のスキーマ バージョンURL
     
-    -- ===== INSTRUMENTATION SCOPE =====
-    -- Information about the metrics collection library/framework  
-    ScopeName String CODEC(ZSTD(1)),                            -- Name of instrumentation library (e.g., "http-server", "database-client")
-    ScopeVersion String CODEC(ZSTD(1)),                         -- Version of instrumentation library
+    -- ===== インストルメンテーション スコープ =====
+    -- メトリクス収集ライブラリ/フレームワークに関する情報  
+    ScopeName String CODEC(ZSTD(1)),                            -- インストルメンテーション ライブラリ名（例: "http-server", "database-client"）
+    ScopeVersion String CODEC(ZSTD(1)),                         -- インストルメンテーション ライブラリのバージョン
     ScopeAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Additional metadata about the instrumentation scope
-    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),               -- Count of scope attributes dropped due to limits
-    ScopeSchemaUrl String CODEC(ZSTD(1)),                       -- Schema version URL for scope attributes
+                                                                  -- インストルメンテーション スコープに関する追加メタデータ
+    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),               -- 制限により削除されたスコープ属性数
+    ScopeSchemaUrl String CODEC(ZSTD(1)),                       -- スコープ属性のスキーマ バージョンURL
     
-    -- ===== SERVICE AND METRIC IDENTIFICATION =====
-    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- Service name for grouping and filtering
-                                                                  -- LowCardinality optimizes for repeated values
-    MetricName String CODEC(ZSTD(1)),                           -- Name of the metric (e.g., "http_request_duration", "response_size_bytes")
-    MetricDescription String CODEC(ZSTD(1)),                    -- Human-readable description of the metric
-    MetricUnit String CODEC(ZSTD(1)),                           -- Unit of measurement (e.g., "seconds", "bytes", "1")
+    -- ===== サービスとメトリクス識別 =====
+    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- グループ化とフィルタリングのためのサービス名
+                                                                  -- LowCardinalityにより重複値が最適化される
+    MetricName String CODEC(ZSTD(1)),                           -- メトリクス名（例: "http_request_duration", "response_size_bytes"）
+    MetricDescription String CODEC(ZSTD(1)),                    -- メトリクスの人間が読める説明
+    MetricUnit String CODEC(ZSTD(1)),                           -- 測定単位（例: "seconds", "bytes", "1"）
     
-    -- ===== METRIC DIMENSIONS =====
-    -- Labels/dimensions that provide context to the metric value
+    -- ===== メトリクス ディメンション =====
+    -- メトリクス値にコンテキストを提供するラベル/ディメンション
     Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
                                                                   -- Metric dimensions: method, endpoint, status_code, instance
                                                                   -- These create the unique time series identity

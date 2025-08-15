@@ -1,94 +1,94 @@
--- ClickHouse Metrics Gauge Table Schema for OpenTelemetry Data
--- This table stores gauge metric data points (instantaneous measurements)
--- Gauge metrics represent a value that can go up and down arbitrarily (CPU usage, memory, temperature, etc.)
--- Based on OpenTelemetry metrics data model: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
+-- OpenTelemetryデータのためのClickHouse Metrics Gaugeテーブル スキーマ
+-- このテーブルはGaugeメトリクス データポイント（瞬間的な測定値）を保存します
+-- Gaugeメトリクスは任意に上下する値を表します（CPU使用率、メモリ、温度など）
+-- OpenTelemetryメトリクス データモデルに基づく: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
 
 CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
-    -- ===== RESOURCE IDENTIFICATION =====
-    -- Metadata about the resource (service, host, container) emitting metrics
+    -- ===== リソース識別 =====
+    -- メトリクスを発行するリソース（サービス、ホスト、コンテナ）に関するメタデータ
     ResourceAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Resource metadata: service.name, host.name, k8s.pod.name
-                                                                  -- Map type enables flexible querying of resource properties
-    ResourceSchemaUrl String CODEC(ZSTD(1)),                    -- Schema version URL for resource attributes
+                                                                  -- リソースメタデータ: service.name, host.name, k8s.pod.name
+                                                                  -- Map型によりリソースプロパティの柔軟なクエリが可能
+    ResourceSchemaUrl String CODEC(ZSTD(1)),                    -- リソース属性のスキーマ バージョンURL
     
-    -- ===== INSTRUMENTATION SCOPE =====
-    -- Information about the metrics collection library/framework
-    ScopeName String CODEC(ZSTD(1)),                            -- Name of instrumentation library (e.g., "prometheus", "custom-metrics")
-    ScopeVersion String CODEC(ZSTD(1)),                         -- Version of instrumentation library
+    -- ===== インストルメンテーション スコープ =====
+    -- メトリクス収集ライブラリ/フレームワークに関する情報
+    ScopeName String CODEC(ZSTD(1)),                            -- インストルメンテーション ライブラリ名（例: "prometheus", "custom-metrics"）
+    ScopeVersion String CODEC(ZSTD(1)),                         -- インストルメンテーション ライブラリのバージョン
     ScopeAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Additional metadata about the instrumentation scope
-    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),               -- Count of scope attributes dropped due to limits
-    ScopeSchemaUrl String CODEC(ZSTD(1)),                       -- Schema version URL for scope attributes
+                                                                  -- インストルメンテーション スコープに関する追加メタデータ
+    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),               -- 制限により削除されたスコープ属性数
+    ScopeSchemaUrl String CODEC(ZSTD(1)),                       -- スコープ属性のスキーマ バージョンURL
     
-    -- ===== SERVICE AND METRIC IDENTIFICATION =====
-    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- Service name for grouping and filtering
-                                                                  -- LowCardinality optimizes for repeated values
-    MetricName String CODEC(ZSTD(1)),                           -- Name of the metric (e.g., "cpu_usage_percent", "memory_bytes")
-    MetricDescription String CODEC(ZSTD(1)),                    -- Human-readable description of the metric
-    MetricUnit String CODEC(ZSTD(1)),                           -- Unit of measurement (e.g., "percent", "bytes", "seconds")
+    -- ===== サービスとメトリクス識別 =====
+    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- グループ化とフィルタリングのためのサービス名
+                                                                  -- LowCardinalityにより重複値が最適化される
+    MetricName String CODEC(ZSTD(1)),                           -- メトリクス名（例: "cpu_usage_percent", "memory_bytes"）
+    MetricDescription String CODEC(ZSTD(1)),                    -- メトリクスの人間が読める説明
+    MetricUnit String CODEC(ZSTD(1)),                           -- 測定単位（例: "percent", "bytes", "seconds"）
     
-    -- ===== METRIC DIMENSIONS =====
-    -- Labels/dimensions that provide context to the metric value
+    -- ===== メトリクス ディメンション =====
+    -- メトリクス値にコンテキストを提供するラベル/ディメンション
     Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Metric dimensions: instance, job, endpoint, status_code
-                                                                  -- These create the unique time series identity
+                                                                  -- メトリクス ディメンション: instance, job, endpoint, status_code
+                                                                  -- これらがユニークな時系列の識別子を作成する
     
-    -- ===== TEMPORAL FIELDS =====
-    -- Timestamp information for gauge measurements
-    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- When the measurement period started (for context)
-                                                                  -- Delta codec optimal for time series data
-    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- Actual timestamp of the gauge measurement
-                                                                  -- Primary temporal dimension for queries
+    -- ===== 時間フィールド =====
+    -- Gauge測定のタイムスタンプ情報
+    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- 測定期間の開始時刻（コンテキスト用）
+                                                                  -- Deltaコーデックは時系列データに最適
+    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- Gauge測定の実際のタイムスタンプ
+                                                                  -- クエリの主要な時間ディメンション
     
-    -- ===== GAUGE VALUE =====
-    -- The actual measured value at the specific point in time
-    Value Float64 CODEC(ZSTD(1)),                               -- Gauge measurement value (can be positive, negative, or zero)
-                                                                  -- Float64 provides sufficient precision for most use cases
+    -- ===== GAUGE値 =====
+    -- 特定の時点で実際に測定された値
+    Value Float64 CODEC(ZSTD(1)),                               -- Gauge測定値（正、負、またはゼロが可能）
+                                                                  -- Float64はほとんどのユースケースで十分な精度を提供
     
-    -- ===== METADATA AND FLAGS =====
-    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetry data point flags (reserved for future use)
+    -- ===== メタデータとフラグ =====
+    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetryデータポイントフラグ（将来の利用のために予約）
     
-    -- ===== EXEMPLARS =====
-    -- Sample traces that contributed to this metric data point
-    -- Exemplars provide linkage between metrics and distributed traces
+    -- ===== エグゼンプラー =====
+    -- このメトリクス データポイントに寄与したサンプル トレース
+    -- エグゼンプラーはメトリクスと分散トレースの間のリンクを提供する
     Exemplars Nested (
-        FilteredAttributes Map(LowCardinality(String), String), -- Additional exemplar attributes
-        TimeUnix DateTime64(9),                                  -- When this exemplar was captured
-        Value Float64,                                           -- Value associated with this exemplar
-        SpanId String,                                           -- Span ID of the trace that generated this exemplar
-        TraceId String                                           -- Trace ID for correlation with tracing data
-    ) CODEC(ZSTD(1)),                                           -- Nested type allows multiple exemplars per data point
+        FilteredAttributes Map(LowCardinality(String), String), -- 追加のエグゼンプラー属性
+        TimeUnix DateTime64(9),                                  -- このエグゼンプラーがキャプチャされた時刻
+        Value Float64,                                           -- このエグゼンプラーに関連する値
+        SpanId String,                                           -- このエグゼンプラーを生成したトレースのSpan ID
+        TraceId String                                           -- トレーシング データとの相関用のTrace ID
+    ) CODEC(ZSTD(1)),                                           -- Nested型により、1つのデータポイントに複数のエグゼンプラーが可能
     
-    -- ===== AGGREGATION METADATA =====
-    AggregationTemporality Int32 CODEC(ZSTD(1)),               -- How data points are aggregated:
+    -- ===== 集約メタデータ =====
+    AggregationTemporality Int32 CODEC(ZSTD(1)),               -- データポイントの集約方法:
                                                                   -- 0 = UNSPECIFIED, 1 = DELTA, 2 = CUMULATIVE
-    IsMonotonic Boolean CODEC(Delta, ZSTD(1)),                 -- Whether the gauge only increases (false for most gauges)
-                                                                  -- Delta codec efficient for boolean values
+    IsMonotonic Boolean CODEC(Delta, ZSTD(1)),                 -- Gaugeが増加のみかどうか（ほとんどのGaugeではfalse）
+                                                                  -- Deltaコーデックはboolean値に効率的
     
-    -- ===== PERFORMANCE INDEXES =====
-    -- Bloom filter indexes for high-speed attribute searches
-    -- Critical for performance when querying by labels/dimensions
+    -- ===== パフォーマンス インデックス =====
+    -- 高速属性検索のためのBloomフィルタインデックス
+    -- ラベル/ディメンションによるクエリのパフォーマンスに重要
     INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of resource attribute keys
+                                                                  -- リソース属性キーの高速検索
     INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of resource attribute values
+                                                                  -- リソース属性値の高速検索
     INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of scope attribute keys
+                                                                  -- スコープ属性キーの高速検索
     INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of scope attribute values
+                                                                  -- スコープ属性値の高速検索
     INDEX idx_attr_key mapKeys(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of metric attribute keys (labels)
+                                                                  -- メトリクス属性キー（ラベル）の高速検索
     INDEX idx_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1
-                                                                  -- Fast lookup of metric attribute values (label values)
+                                                                  -- メトリクス属性値（ラベル値）の高速検索
     ) ENGINE = %s
     %s
-    PARTITION BY toDate(TimeUnix)                               -- Daily partitions for efficient data lifecycle management
+    PARTITION BY toDate(TimeUnix)                               -- 効率的なデータライフサイクル管理のための日次パーティション
     ORDER BY (ServiceName, MetricName, Attributes, toUnixTimestamp64Nano(TimeUnix))
-                                                                  -- Optimal sort order for typical metric queries:
-                                                                  -- 1. Filter by service
-                                                                  -- 2. Filter by metric name  
-                                                                  -- 3. Filter by dimensions/labels
-                                                                  -- 4. Time-based ordering (newest first)
-    SETTINGS index_granularity=8192, ttl_only_drop_parts = 1   -- Performance tuning:
-                                                                  -- index_granularity: Balance memory vs precision
-                                                                  -- ttl_only_drop_parts: Efficient partition-level TTL
+                                                                  -- 典型的なメトリクス クエリに最適化されたソート順序:
+                                                                  -- 1. サービス名でフィルタ
+                                                                  -- 2. メトリクス名でフィルタ  
+                                                                  -- 3. ディメンション/ラベルでフィルタ
+                                                                  -- 4. 時系列順序（最新が先）
+    SETTINGS index_granularity=8192, ttl_only_drop_parts = 1   -- パフォーマンス調整:
+                                                                  -- index_granularity: メモリと精度のバランス調整
+                                                                  -- ttl_only_drop_parts: パーティション レベルの効率的なTTL

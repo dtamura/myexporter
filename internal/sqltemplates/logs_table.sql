@@ -1,34 +1,34 @@
--- ClickHouse Logs Table Schema for OpenTelemetry Data
--- This table stores structured log data with comprehensive indexing and optimization
--- Based on OpenTelemetry logs data model: https://opentelemetry.io/docs/specs/otel/logs/data-model/
+-- OpenTelemetryデータのためのClickHouse Logsテーブル スキーマ
+-- このテーブルは包括的なインデックス化と最適化を備えた構造化ログデータを保存します
+-- OpenTelemetryログ データモデルに基づく: https://opentelemetry.io/docs/specs/otel/logs/data-model/
 
 CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
-    -- ===== TIMESTAMP FIELDS =====
-    -- These fields handle the critical temporal aspects of log data
-    Timestamp DateTime64(9) CODEC(Delta, ZSTD(1)),              -- Primary log event timestamp with nanosecond precision
-                                                                  -- Delta codec is optimal for time series data
-    ObservedTimestamp DateTime64(9) CODEC(Delta, ZSTD(1)),      -- When the log was observed/collected
-                                                                  -- Often differs from Timestamp in distributed systems
+    -- ===== タイムスタンプ フィールド =====
+    -- これらのフィールドはログデータの重要な時間的側面を処理します
+    Timestamp DateTime64(9) CODEC(Delta, ZSTD(1)),              -- ナノ秒精度での主要ログイベント タイムスタンプ
+                                                                  -- Deltaコーデックは時系列データに最適
+    ObservedTimestamp DateTime64(9) CODEC(Delta, ZSTD(1)),      -- ログが観測/収集された時刻
+                                                                  -- 分散システムでは多くの場合Timestampと異なる
     
-    -- ===== CORRELATION IDENTIFIERS =====  
-    -- These fields enable correlation with distributed traces and spans
-    TraceId String CODEC(ZSTD(1)),                              -- Links log to distributed trace (32-char hex string)
-    SpanId String CODEC(ZSTD(1)),                               -- Links log to specific span (16-char hex string)
-    TraceFlags UInt32 CODEC(ZSTD(1)),                           -- Trace sampling flags from W3C trace context
+    -- ===== 相関識別子 =====  
+    -- これらのフィールドにより分散トレースとスパンとの相関が可能になります
+    TraceId String CODEC(ZSTD(1)),                              -- ログを分散トレースにリンクする（32文字の16進文字列）
+    SpanId String CODEC(ZSTD(1)),                               -- ログを特定のスパンにリンクする（16文字の16進文字列）
+    TraceFlags UInt32 CODEC(ZSTD(1)),                           -- W3Cトレース コンテキストからのトレース サンプリング フラグ
     
-    -- ===== SEVERITY AND CLASSIFICATION =====
-    -- OpenTelemetry severity model with both numeric and text representations
-    SeverityText LowCardinality(String) CODEC(ZSTD(1)),         -- Human-readable severity (ERROR, WARN, INFO, DEBUG, etc.)
-                                                                  -- LowCardinality optimizes repeated values
-    SeverityNumber Int32 CODEC(ZSTD(1)),                        -- Numeric severity level (1-24 per OTel spec)
-                                                                  -- Enables range queries and numerical comparisons
+    -- ===== 重要度と分類 =====
+    -- 数値とテキスト表現の両方を持つOpenTelemetry重要度モデル
+    SeverityText LowCardinality(String) CODEC(ZSTD(1)),         -- 人間が読める重要度（ERROR, WARN, INFO, DEBUG など）
+                                                                  -- LowCardinalityにより重複値が最適化される
+    SeverityNumber Int32 CODEC(ZSTD(1)),                        -- 数値重要度レベル（OTel仕様の1-24）
+                                                                  -- 範囲クエリと数値比較が可能
     
-    -- ===== SERVICE AND SOURCE IDENTIFICATION =====
-    -- These fields identify the source service and instrumentation
-    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- Service generating the log (for filtering/grouping)
-    ServiceVersion String CODEC(ZSTD(1)),                       -- Service version for deployment tracking
+    -- ===== サービスとソース識別 =====
+    -- これらのフィールドはソースサービスとインストルメンテーションを識別します
+    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- ログを生成するサービス（フィルタリング/グループ化用）
+    ServiceVersion String CODEC(ZSTD(1)),                       -- デプロイメント トラッキング用のサービス バージョン
     
-    -- ===== LOG CONTENT =====
+    -- ===== ログ内容 =====
     -- The actual log message content with flexible structure
     Body String CODEC(ZSTD(1)),                                 -- Primary log message content
                                                                   -- Can be structured (JSON) or unstructured text

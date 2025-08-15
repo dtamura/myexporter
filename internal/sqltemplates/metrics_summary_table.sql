@@ -1,104 +1,104 @@
--- ClickHouse Metrics Summary Table Schema for OpenTelemetry Data  
--- This table stores summary metric data points (quantile-based distribution measurements)
--- Summaries represent pre-calculated quantiles of observed values (P50, P95, P99 latencies, etc.)
--- Based on OpenTelemetry metrics data model: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
+-- ClickHouse メトリクス Summary テーブル スキーマ (OpenTelemetry データ用)
+-- このテーブルはsummaryメトリクスデータポイント（分位数ベースの分布測定）を格納します
+-- Summariesは観測値の事前計算済み分位数を表します（P50、P95、P99レイテンシなど）
+-- OpenTelemetry メトリクスデータモデルに基づく: https://opentelemetry.io/docs/specs/otel/metrics/data-model/
 
 CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
-    -- ===== RESOURCE IDENTIFICATION =====
-    -- Metadata about the resource (service, host, container) emitting metrics
+    -- ===== リソース識別 =====
+    -- メトリクスを出力するリソース（サービス、ホスト、コンテナ）に関するメタデータ
     ResourceAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Resource metadata: service.name, host.name, k8s.pod.name
-                                                                  -- Map type enables flexible querying of resource properties
-    ResourceSchemaUrl String CODEC(ZSTD(1)),                    -- Schema version URL for resource attributes
+                                                                  -- リソースメタデータ: service.name, host.name, k8s.pod.name
+                                                                  -- Map型によりリソースプロパティの柔軟なクエリが可能
+    ResourceSchemaUrl String CODEC(ZSTD(1)),                    -- リソース属性のスキーマバージョンURL
     
-    -- ===== INSTRUMENTATION SCOPE =====
-    -- Information about the metrics collection library/framework
-    ScopeName String CODEC(ZSTD(1)),                            -- Name of instrumentation library (e.g., "prometheus-client", "custom-metrics")
-    ScopeVersion String CODEC(ZSTD(1)),                         -- Version of instrumentation library
+    -- ===== インストルメンテーションスコープ =====
+    -- メトリクス収集ライブラリ/フレームワークに関する情報
+    ScopeName String CODEC(ZSTD(1)),                            -- インストルメンテーションライブラリ名 (例: "prometheus-client", "custom-metrics")
+    ScopeVersion String CODEC(ZSTD(1)),                         -- インストルメンテーションライブラリのバージョン
     ScopeAttributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Additional metadata about the instrumentation scope
-    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),               -- Count of scope attributes dropped due to limits
-    ScopeSchemaUrl String CODEC(ZSTD(1)),                       -- Schema version URL for scope attributes
+                                                                  -- インストルメンテーションスコープに関する追加メタデータ
+    ScopeDroppedAttrCount UInt32 CODEC(ZSTD(1)),               -- 制限により削除されたスコープ属性の数
+    ScopeSchemaUrl String CODEC(ZSTD(1)),                       -- スコープ属性のスキーマバージョンURL
     
-    -- ===== SERVICE AND METRIC IDENTIFICATION =====
-    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- Service name for grouping and filtering
-                                                                  -- LowCardinality optimizes for repeated values
-    MetricName String CODEC(ZSTD(1)),                           -- Name of the metric (e.g., "http_request_duration_summary", "gc_duration_summary")
-    MetricDescription String CODEC(ZSTD(1)),                    -- Human-readable description of the metric
-    MetricUnit String CODEC(ZSTD(1)),                           -- Unit of measurement (e.g., "seconds", "bytes", "1")
+    -- ===== サービスとメトリクス識別 =====
+    ServiceName LowCardinality(String) CODEC(ZSTD(1)),          -- グループ化とフィルタリング用のサービス名
+                                                                  -- LowCardinalityは反復値に対して最適化
+    MetricName String CODEC(ZSTD(1)),                           -- メトリクス名 (例: "http_request_duration_summary", "gc_duration_summary")
+    MetricDescription String CODEC(ZSTD(1)),                    -- メトリクスの人間が読める説明
+    MetricUnit String CODEC(ZSTD(1)),                           -- 測定単位 (例: "seconds", "bytes", "1")
     
-    -- ===== METRIC DIMENSIONS =====
-    -- Labels/dimensions that provide context to the metric value
+    -- ===== メトリクスディメンション =====
+    -- メトリクス値にコンテキストを提供するラベル/ディメンション
     Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Metric dimensions: job, instance, method, handler
-                                                                  -- These create the unique time series identity
+                                                                  -- メトリクスディメンション: job, instance, method, handler
+                                                                  -- これらがユニークな時系列アイデンティティを作成
     
-    -- ===== TEMPORAL FIELDS =====
-    -- Timestamp information for summary measurements
-    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- When the observation period started
-                                                                  -- Important for understanding the calculation window
-    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- Timestamp when this summary was observed
-                                                                  -- Primary temporal dimension for queries
+    -- ===== 時系列フィールド =====
+    -- summaryメトリクス測定のタイムスタンプ情報
+    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- 観測期間の開始時刻
+                                                                  -- 計算ウィンドウの理解に重要
+    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- このsummaryが観測された時刻
+                                                                  -- クエリの主要な時系列ディメンション
     
-    -- ===== SUMMARY CORE VALUES =====
-    -- Essential aggregation statistics
-    Count UInt64 CODEC(Delta, ZSTD(1)),                        -- Total number of observations summarized
-                                                                  -- Delta codec optimal for monotonically increasing counters
-    Sum Float64 CODEC(ZSTD(1)),                                 -- Sum of all observed values
-                                                                  -- Enables calculation of average: Sum/Count
+    -- ===== サマリー コア値 =====
+    -- 重要な集計統計
+    Count UInt64 CODEC(Delta, ZSTD(1)),                        -- サマリー化された観測値の総数
+                                                                  -- 単調増加カウンターにDeltaコーデックが最適
+    Sum Float64 CODEC(ZSTD(1)),                                 -- すべての観測値の合計
+                                                                  -- 平均値の計算を可能にする: Sum/Count
     
-    -- ===== QUANTILE VALUES =====
-    -- Pre-calculated quantiles providing distribution insights
-    -- Unlike histograms, summaries store exact quantile values calculated on the client side
+    -- ===== 分位数値 =====
+    -- 分布の洞察を提供する事前計算された分位数
+    -- ヒストグラムとは異なり、Summaryはクライアント側で計算された正確な分位数値を保存します
     ValueAtQuantiles Nested(
-        Quantile Float64,                                        -- Quantile level (e.g., 0.5 for median, 0.95 for P95, 0.99 for P99)
-        Value Float64                                            -- Actual value at this quantile
-    ) CODEC(ZSTD(1)),                                           -- Nested type allows multiple quantiles per summary
-                                                                  -- Common quantiles: 0.5 (median), 0.9, 0.95, 0.99
-                                                                  -- Enables direct SLA monitoring without bucket calculations
+        Quantile Float64,                                        -- 分位数レベル (例: 0.5は中央値、0.95はP95、0.99はP99)
+        Value Float64                                            -- この分位数における実際の値
+    ) CODEC(ZSTD(1)),                                           -- Nested型により、1つのSummaryに複数の分位数を格納可能
+                                                                  -- 一般的な分位数: 0.5 (中央値), 0.9, 0.95, 0.99
+                                                                  -- バケット計算なしで直接SLAモニタリングが可能
     
-    -- ===== METADATA AND FLAGS =====
-    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetry data point flags (reserved for future use)
+    -- ===== メタデータとフラグ =====
+    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetryデータポイントフラグ (将来の利用のために予約)
     
-    -- ===== PERFORMANCE INDEXES =====
-    -- Bloom filter indexes for high-speed attribute searches
-    -- Essential for performance when querying by labels/dimensions
+    -- ===== パフォーマンス インデックス =====
+    -- 高速属性検索のためのBloomフィルタインデックス
+    -- ラベル/ディメンションによるクエリのパフォーマンスに必須
     INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of resource attribute keys
+                                                                  -- リソース属性キーの高速検索
     INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of resource attribute values
+                                                                  -- リソース属性値の高速検索
     INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of scope attribute keys
+                                                                  -- スコープ属性キーの高速検索
     INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of scope attribute values
+                                                                  -- スコープ属性値の高速検索
     INDEX idx_attr_key mapKeys(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of metric attribute keys (labels)
+                                                                  -- メトリクス属性キー（ラベル）の高速検索
     INDEX idx_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1
-                                                                  -- Fast lookup of metric attribute values (label values)
+                                                                  -- メトリクス属性値（ラベル値）の高速検索
     ) ENGINE = %s
     %s
-    PARTITION BY toDate(TimeUnix)                               -- Daily partitions for efficient data lifecycle management
+    PARTITION BY toDate(TimeUnix)                               -- 効率的なデータライフサイクル管理のための日次パーティション
     ORDER BY (ServiceName, MetricName, Attributes, toUnixTimestamp64Nano(TimeUnix))
-                                                                  -- Optimal sort order for typical summary queries:
-                                                                  -- 1. Filter by service
-                                                                  -- 2. Filter by metric name (e.g., latency summaries)
-                                                                  -- 3. Filter by dimensions (job, instance)
-                                                                  -- 4. Time-based ordering for trend analysis
-    SETTINGS index_granularity=8192, ttl_only_drop_parts = 1   -- Performance tuning:
-                                                                  -- index_granularity: Balance memory vs precision
-                                                                  -- ttl_only_drop_parts: Efficient partition-level TTL
+                                                                  -- 典型的なSummaryクエリに最適化されたソート順序:
+                                                                  -- 1. サービス名でフィルタ
+                                                                  -- 2. メトリクス名でフィルタ（例: レイテンシーサマリー）
+                                                                  -- 3. ディメンションでフィルタ（job, instanceなど）
+                                                                  -- 4. トレンド分析のための時系列順序
+    SETTINGS index_granularity=8192, ttl_only_drop_parts = 1   -- パフォーマンス調整:
+                                                                  -- index_granularity: メモリと精度のバランス調整
+                                                                  -- ttl_only_drop_parts: パーティション レベルの効率的なTTL
 
--- SUMMARY VS HISTOGRAM COMPARISON:
--- Summaries:
--- - Pre-calculated quantiles (P50, P95, P99) computed on client side
--- - Exact quantile values, no approximation
--- - Cannot aggregate across multiple instances
--- - Lower storage overhead for specific quantiles
--- - Ideal for client-side SLA monitoring
+-- SUMMARY VS HISTOGRAMの比較:
+-- Summary:
+-- - クライアント側で計算された事前計算済み分位数（P50, P95, P99）
+-- - 正確な分位数値、近似値なし
+-- - 複数のインスタンス間で集約不可
+-- - 特定の分位数に対するストレージオーバーヘッドが低い
+-- - クライアント側SLAモニタリングに最適
 --
--- Histograms:  
--- - Bucket-based distribution with configurable bounds
--- - Quantiles calculated server-side from buckets (approximate)
--- - Can aggregate across multiple instances
--- - Higher storage overhead but more flexible
--- - Ideal for server-side analysis and aggregation
+-- Histogram:  
+-- - 設定可能な境界を持つバケット ベースの分布
+-- - バケットからサーバー側で分位数を計算（近似値）
+-- - 複数のインスタンス間で集約可能
+-- - ストレージオーバーヘッドが高いが、より柔軟
+-- - サーバー側分析と集約に最適
