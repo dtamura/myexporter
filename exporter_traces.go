@@ -13,6 +13,9 @@ import (
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.uber.org/zap"
+
+	"github.com/dtamura/myexporter/internal"
+	"github.com/dtamura/myexporter/internal/sqltemplates"
 )
 
 type tracesExporter struct {
@@ -62,7 +65,15 @@ func (e *tracesExporter) start(ctx context.Context, host component.Host) error {
 			return err
 		}
 
-		// 2. 接続テスト
+		// 2. テーブル作成（新規追加）
+		if e.config.shouldCreateSchema() {
+			if err := e.createTraceTables(ctx); err != nil {
+				e.logger.Error("トレーステーブル作成に失敗しました", zap.Error(err))
+				return err
+			}
+		}
+
+		// 3. 接続テスト
 		ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel()
 
@@ -142,6 +153,83 @@ func (e *tracesExporter) pushTraces(ctx context.Context, td ptrace.Traces) error
 	// エラーがある場合はそれを返す（exporterhelperがFailedメトリクスを記録）
 	// エラーがない場合はnilを返す（exporterhelperがSentメトリクスを記録）
 	return processingErr
+}
+
+// createTraceTables - トレース用のテーブルを作成します
+func (e *tracesExporter) createTraceTables(ctx context.Context) error {
+	e.logger.Info("トレーステーブル作成を開始します",
+		zap.String("database", e.config.database()),
+		zap.String("table", e.config.TracesTableName))
+
+	// 1. メインのトレーステーブルを作成
+	createTableSQL := e.renderCreateTracesTableSQL()
+	if err := e.execSQL(ctx, createTableSQL, "traces table"); err != nil {
+		return err
+	}
+
+	// 2. トレースID-タイムスタンプ検索用テーブルを作成
+	createTsTableSQL := e.renderCreateTraceIDTsTableSQL()
+	if err := e.execSQL(ctx, createTsTableSQL, "trace ID timestamp table"); err != nil {
+		return err
+	}
+
+	// 3. トレースID-タイムスタンプ検索用マテリアライズドビューを作成
+	createTsViewSQL := e.renderTraceIDTsMaterializedViewSQL()
+	if err := e.execSQL(ctx, createTsViewSQL, "trace ID timestamp materialized view"); err != nil {
+		return err
+	}
+
+	e.logger.Info("トレーステーブル作成が完了しました")
+	return nil
+}
+
+// renderCreateTracesTableSQL - メインのトレーステーブル作成SQLを生成
+func (e *tracesExporter) renderCreateTracesTableSQL() string {
+	ttlExpr := internal.GenerateTTLExpr(e.config.TTL, "toDateTime(Timestamp)")
+	return fmt.Sprintf(sqltemplates.TracesCreateTable,
+		e.config.database(), e.config.TracesTableName, e.config.clusterString(),
+		e.config.tableEngineString(),
+		ttlExpr,
+	)
+}
+
+// renderCreateTraceIDTsTableSQL - トレースID-タイムスタンプ検索テーブル作成SQLを生成
+func (e *tracesExporter) renderCreateTraceIDTsTableSQL() string {
+	ttlExpr := internal.GenerateTTLExpr(e.config.TTL, "toDateTime(Start)")
+	return fmt.Sprintf(sqltemplates.TracesCreateTsTable,
+		e.config.database(), e.config.TracesTableName, e.config.clusterString(),
+		e.config.tableEngineString(),
+		ttlExpr,
+	)
+}
+
+// renderTraceIDTsMaterializedViewSQL - トレースID-タイムスタンプマテリアライズドビュー作成SQLを生成
+func (e *tracesExporter) renderTraceIDTsMaterializedViewSQL() string {
+	database := e.config.database()
+	return fmt.Sprintf(sqltemplates.TracesCreateTsView,
+		database, e.config.TracesTableName, e.config.clusterString(),
+		database, e.config.TracesTableName,
+		database, e.config.TracesTableName,
+	)
+}
+
+// execSQL - SQLを実行してエラーログを出力するヘルパーメソッド
+func (e *tracesExporter) execSQL(ctx context.Context, sql, description string) error {
+	e.logger.Debug("SQL実行開始",
+		zap.String("description", description),
+		zap.String("sql", sql))
+
+	_, err := e.db.ExecContext(ctx, sql)
+	if err != nil {
+		e.logger.Error("SQL実行に失敗しました",
+			zap.String("description", description),
+			zap.String("sql", sql),
+			zap.Error(err))
+		return fmt.Errorf("%s作成に失敗しました: %w", description, err)
+	}
+
+	e.logger.Info("SQL実行が完了しました", zap.String("description", description))
+	return nil
 }
 
 // insertSpanToDB は将来実装予定のDB挿入機能

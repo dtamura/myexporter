@@ -137,16 +137,3 @@ func createDatabase(ctx context.Context, cfg *Config, logger *zap.Logger) error 
 	logger.Info("データベース作成が完了しました", zap.String("database", cfg.Database))
 	return nil
 }
-
-// createDatabase と createTables は将来実装予定
-// 現在は DB接続テストのみ実装
-
-// func createDatabase(ctx context.Context, cfg *Config, logger *zap.Logger) error {
-// 	// TODO: データベース作成処理を実装
-// 	return nil
-// }
-
-// func createTables(ctx context.Context, cfg *Config, db *sql.DB, logger *zap.Logger) error {
-// 	// TODO: テーブル作成処理を実装
-// 	return nil
-// }
