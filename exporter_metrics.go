@@ -88,6 +88,7 @@ func (e *metricsExporter) shutdown(ctx context.Context) error {
 func (e *metricsExporter) pushMetrics(ctx context.Context, md pmetric.Metrics) error {
 	resourceMetrics := md.ResourceMetrics()
 	totalMetrics := 0
+	var processingErr error
 
 	// 各リソースのメトリクスデータを処理
 	for i := 0; i < resourceMetrics.Len(); i++ {
@@ -111,8 +112,15 @@ func (e *metricsExporter) pushMetrics(ctx context.Context, md pmetric.Metrics) e
 				}
 			}
 
-			// データ投入は無効化（DB接続テストのみ）
+			// 現在はデータ投入を無効化（DB接続テストのみ）
 			// TODO: 将来的にデータ投入機能を実装予定
+			//
+			// デモ目的：意図的にエラーをシミュレートしてメトリクスを生成
+			// 15%の確率でエラーを発生させる（メトリクス確認用）
+			if i%15 == 11 {
+				processingErr = fmt.Errorf("デモエラー: メトリクス処理でシミュレートされたエラー (resource %d)", i)
+				e.logger.Warn("メトリクス検証用のシミュレートエラー", zap.Error(processingErr))
+			}
 		}
 	}
 
@@ -121,9 +129,12 @@ func (e *metricsExporter) pushMetrics(ctx context.Context, md pmetric.Metrics) e
 		zap.Int("resource_metrics", resourceMetrics.Len()),
 		zap.Int("total_metrics", totalMetrics),
 		zap.Bool("db_connected", e.db != nil),
+		zap.Bool("has_error", processingErr != nil),
 	)
 
-	return nil
+	// エラーがある場合はそれを返す（exporterhelperがFailedメトリクスを記録）
+	// エラーがない場合はnilを返す（exporterhelperがSentメトリクスを記録）
+	return processingErr
 }
 
 // insertMetricToDB は将来実装予定のDB挿入機能

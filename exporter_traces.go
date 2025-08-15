@@ -94,6 +94,7 @@ func (e *tracesExporter) shutdown(ctx context.Context) error {
 func (e *tracesExporter) pushTraces(ctx context.Context, td ptrace.Traces) error {
 	resourceSpans := td.ResourceSpans()
 	totalSpans := 0
+	var processingErr error
 
 	// 各リソースのスパンデータを処理
 	for i := 0; i < resourceSpans.Len(); i++ {
@@ -118,8 +119,15 @@ func (e *tracesExporter) pushTraces(ctx context.Context, td ptrace.Traces) error
 				}
 			}
 
-			// データ投入は無効化（DB接続テストのみ）
+			// 現在はデータ投入を無効化（DB接続テストのみ）
 			// TODO: 将来的にデータ投入機能を実装予定
+			//
+			// デモ目的：意図的にエラーをシミュレートしてメトリクスを生成
+			// 10%の確率でエラーを発生させる（メトリクス確認用）
+			if i%10 == 7 {
+				processingErr = fmt.Errorf("デモエラー: スパン処理でシミュレートされたエラー (resource %d)", i)
+				e.logger.Warn("メトリクス検証用のシミュレートエラー", zap.Error(processingErr))
+			}
 		}
 	}
 
@@ -128,9 +136,12 @@ func (e *tracesExporter) pushTraces(ctx context.Context, td ptrace.Traces) error
 		zap.Int("resource_spans", resourceSpans.Len()),
 		zap.Int("total_spans", totalSpans),
 		zap.Bool("db_connected", e.db != nil),
+		zap.Bool("has_error", processingErr != nil),
 	)
 
-	return nil
+	// エラーがある場合はそれを返す（exporterhelperがFailedメトリクスを記録）
+	// エラーがない場合はnilを返す（exporterhelperがSentメトリクスを記録）
+	return processingErr
 }
 
 // insertSpanToDB は将来実装予定のDB挿入機能

@@ -90,6 +90,7 @@ func (e *logsExporter) shutdown(ctx context.Context) error {
 func (e *logsExporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 	resourceLogs := ld.ResourceLogs()
 	totalLogs := 0
+	var processingErr error
 
 	// 各リソースのログデータを処理
 	for i := 0; i < resourceLogs.Len(); i++ {
@@ -112,8 +113,15 @@ func (e *logsExporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 				}
 			}
 
-			// データ投入は無効化（DB接続テストのみ）
+			// 現在はデータ投入を無効化（DB接続テストのみ）
 			// TODO: 将来的にデータ投入機能を実装予定
+			//
+			// デモ目的：意図的にエラーをシミュレートしてメトリクスを生成
+			// 8%の確率でエラーを発生させる（メトリクス確認用）
+			if i%12 == 5 {
+				processingErr = fmt.Errorf("デモエラー: ログ処理でシミュレートされたエラー (resource %d)", i)
+				e.logger.Warn("ログ検証用のシミュレートエラー", zap.Error(processingErr))
+			}
 		}
 	}
 
@@ -122,9 +130,12 @@ func (e *logsExporter) pushLogs(ctx context.Context, ld plog.Logs) error {
 		zap.Int("resource_logs", resourceLogs.Len()),
 		zap.Int("total_logs", totalLogs),
 		zap.Bool("db_connected", e.db != nil),
+		zap.Bool("has_error", processingErr != nil),
 	)
 
-	return nil
+	// エラーがある場合はそれを返す（exporterhelperがFailedメトリクスを記録）
+	// エラーがない場合はnilを返す（exporterhelperがSentメトリクスを記録）
+	return processingErr
 }
 
 // insertLogToDB は将来実装予定のDB挿入機能
