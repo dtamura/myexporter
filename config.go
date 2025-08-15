@@ -4,8 +4,6 @@
 package myexporter
 
 import (
-	"time"
-
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configopaque"
 	"go.opentelemetry.io/collector/config/configretry"
@@ -14,10 +12,10 @@ import (
 
 // Config は my-log エクスポーターの設定を定義します。
 type Config struct {
-	// エクスポーター標準設定
-	Timeout time.Duration                   `mapstructure:"timeout"`
-	Retry   configretry.BackOffConfig       `mapstructure:"retry_on_failure"`
-	Queue   exporterhelper.QueueBatchConfig `mapstructure:"sending_queue"`
+	// エクスポーター標準設定（新しいAPIに対応）
+	TimeoutSettings           exporterhelper.TimeoutConfig `mapstructure:",squash"`
+	configretry.BackOffConfig `mapstructure:"retry_on_failure"`
+	QueueSettings             exporterhelper.QueueBatchConfig `mapstructure:"sending_queue"`
 
 	// 既存の設定
 	Prefix   string `mapstructure:"prefix"`
@@ -30,17 +28,25 @@ type Config struct {
 	Database         string              `mapstructure:"database"`          // データベース名
 	TableName        string              `mapstructure:"table_name"`        // テーブル名
 	ConnectionParams map[string]string   `mapstructure:"connection_params"` // 追加接続パラメータ
+
+	// 新しく追加された設定（clickhouseexporterと同様）
+	CreateSchema bool   `mapstructure:"create_schema"` // データベース作成の制御
+	Compress     string `mapstructure:"compress"`      // 圧縮アルゴリズム
+	AsyncInsert  bool   `mapstructure:"async_insert"`  // 非同期挿入
 }
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		Timeout:          5 * time.Second,
-		Retry:            configretry.NewDefaultBackOffConfig(),
-		Queue:            exporterhelper.QueueBatchConfig{Enabled: false},
+		TimeoutSettings:  exporterhelper.NewDefaultTimeoutConfig(),
+		QueueSettings:    exporterhelper.NewDefaultQueueConfig(),
+		BackOffConfig:    configretry.NewDefaultBackOffConfig(),
 		Prefix:           "[MyLogExporter]",
 		Detailed:         false,
 		Database:         "default",   // ClickHouseのデフォルトデータベース
 		TableName:        "otel_logs", // ClickHouseらしいテーブル名
 		ConnectionParams: map[string]string{},
+		CreateSchema:     true,  // デフォルトでスキーマ作成を有効
+		Compress:         "lz4", // clickhouseexporterと同様のデフォルト圧縮
+		AsyncInsert:      true,  // 非同期挿入をデフォルトで有効
 	}
 }

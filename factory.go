@@ -45,9 +45,9 @@ func createTracesExporter(
 		// clickhouseexporterと同様の設定を適用
 		exporterhelper.WithStart(exporter.start),       // 開始時の処理（DB接続確認など）
 		exporterhelper.WithShutdown(exporter.shutdown), // 終了時の処理（DB接続クローズなど）
-		exporterhelper.WithTimeout(exporterhelper.TimeoutConfig{Timeout: config.Timeout}),
-		exporterhelper.WithRetry(config.Retry),
-		exporterhelper.WithQueue(config.Queue),
+		exporterhelper.WithTimeout(config.TimeoutSettings),
+		exporterhelper.WithRetry(config.BackOffConfig),
+		exporterhelper.WithQueue(config.QueueSettings),
 		// データを変更しないことを明示（読み取り専用）
 		exporterhelper.WithCapabilities(exporter.Capabilities()),
 	)
@@ -70,9 +70,9 @@ func createMetricsExporter(
 		exporter.pushMetrics, // 実際のメトリクス処理を行う関数
 		exporterhelper.WithStart(exporter.start),
 		exporterhelper.WithShutdown(exporter.shutdown),
-		exporterhelper.WithTimeout(exporterhelper.TimeoutConfig{Timeout: config.Timeout}),
-		exporterhelper.WithRetry(config.Retry),
-		exporterhelper.WithQueue(config.Queue),
+		exporterhelper.WithTimeout(config.TimeoutSettings),
+		exporterhelper.WithRetry(config.BackOffConfig),
+		exporterhelper.WithQueue(config.QueueSettings),
 		// データを変更しないことを明示（読み取り専用）
 		exporterhelper.WithCapabilities(exporter.Capabilities()),
 	)
@@ -95,9 +95,9 @@ func createLogsExporter(
 		exporter.pushLogs, // 実際のログ処理を行う関数
 		exporterhelper.WithStart(exporter.start),
 		exporterhelper.WithShutdown(exporter.shutdown),
-		exporterhelper.WithTimeout(exporterhelper.TimeoutConfig{Timeout: config.Timeout}),
-		exporterhelper.WithRetry(config.Retry),
-		exporterhelper.WithQueue(config.Queue),
+		exporterhelper.WithTimeout(config.TimeoutSettings),
+		exporterhelper.WithRetry(config.BackOffConfig),
+		exporterhelper.WithQueue(config.QueueSettings),
 		// データを変更しないことを明示（読み取り専用）
 		exporterhelper.WithCapabilities(exporter.Capabilities()),
 	)

@@ -42,7 +42,7 @@ func buildDB(cfg *Config, database string) (*sql.DB, error) {
 }
 
 // buildDSN constructs database connection string
-// clickhouseexporterのbuildDSN関数を参考
+// clickhouseexporterのbuildDSN関数を参考（アップデート版）
 func buildDSN(cfg *Config, database string) (string, error) {
 	if cfg.Endpoint == "" {
 		return "", fmt.Errorf("endpoint must be specified")
@@ -63,6 +63,18 @@ func buildDSN(cfg *Config, database string) (string, error) {
 	// HTTPSスキームの場合はセキュア接続を有効化（clickhouseexporterと同様）
 	if dsnURL.Scheme == "https" {
 		queryParams.Set("secure", "true")
+	}
+
+	// 圧縮設定を追加（clickhouseexporterアップデート版）
+	if !queryParams.Has("compress") && (cfg.Compress == "" || cfg.Compress == "true") {
+		queryParams.Set("compress", "lz4")
+	} else if !queryParams.Has("compress") {
+		queryParams.Set("compress", cfg.Compress)
+	}
+
+	// AsyncInsert設定を追加（clickhouseexporterアップデート版）
+	if !queryParams.Has("async_insert") {
+		queryParams.Set("async_insert", fmt.Sprintf("%t", cfg.AsyncInsert))
 	}
 
 	// データベース名を設定 - clickhouseexporterと同様のロジック
@@ -90,8 +102,14 @@ func buildDSN(cfg *Config, database string) (string, error) {
 }
 
 // createDatabase はデータベースのみを作成します（テーブルは作成しません）
-// clickhouseexporterのcreateDatabase関数を参考にした最小限の実装
+// clickhouseexporterのCreateDatabase関数を参考にした実装（アップデート版）
 func createDatabase(ctx context.Context, cfg *Config, logger *zap.Logger) error {
+	// CreateSchemaが無効な場合は何もしない
+	if !cfg.CreateSchema {
+		logger.Info("スキーマ作成が無効化されています、データベース作成をスキップします")
+		return nil
+	}
+
 	if cfg.Database == "" || cfg.Database == "default" {
 		logger.Info("デフォルトデータベースを使用します、作成をスキップします")
 		return nil
@@ -101,7 +119,7 @@ func createDatabase(ctx context.Context, cfg *Config, logger *zap.Logger) error 
 	// clickhouseexporterと同様の実装
 	db, err := buildDB(cfg, "default")
 	if err != nil {
-		return fmt.Errorf("DSN構築に失敗しました: %w", err)
+		return fmt.Errorf("データベース接続の構築に失敗しました: %w", err)
 	}
 	defer func() {
 		_ = db.Close()
