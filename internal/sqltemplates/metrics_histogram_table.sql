@@ -30,81 +30,81 @@ CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
     -- ===== メトリクス ディメンション =====
     -- メトリクス値にコンテキストを提供するラベル/ディメンション
     Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Metric dimensions: method, endpoint, status_code, instance
-                                                                  -- These create the unique time series identity
+                                                                  -- メトリクス ディメンション: method, endpoint, status_code, instance
+                                                                  -- これらがユニークな時系列の識別子を作成する
     
-    -- ===== TEMPORAL FIELDS =====
-    -- Timestamp information for histogram measurements
-    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- When the measurement period started
-                                                                  -- Critical for understanding accumulation window
-    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- Timestamp when this histogram was observed
-                                                                  -- Primary temporal dimension for queries
+    -- ===== 時間フィールド =====
+    -- Histogram測定のタイムスタンプ情報
+    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- 測定期間の開始時刻
+                                                                  -- 蓄積ウィンドウの理解に重要
+    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- このHistogramが観測されたタイムスタンプ
+                                                                  -- クエリの主要な時間ディメンション
     
-    -- ===== HISTOGRAM CORE VALUES =====
-    -- Essential summary statistics of the distribution
-    Count UInt64 CODEC(Delta, ZSTD(1)),                        -- Total number of observations in the histogram
-                                                                  -- Delta codec optimal for monotonically increasing counters
-    Sum Float64 CODEC(ZSTD(1)),                                 -- Sum of all observed values
-                                                                  -- Enables calculation of average: Sum/Count
+    -- ===== HISTOGRAM中核値 =====
+    -- 分布の基本統計サマリー
+    Count UInt64 CODEC(Delta, ZSTD(1)),                        -- Histogramでの観測総数
+                                                                  -- Deltaコーデックは単調増加カウンターに最適
+    Sum Float64 CODEC(ZSTD(1)),                                 -- 全観測値の合計
+                                                                  -- 平均の計算が可能: Sum/Count
     
-    -- ===== HISTOGRAM BUCKETS =====
-    -- The actual distribution data showing value frequencies
-    BucketCounts Array(UInt64) CODEC(ZSTD(1)),                 -- Count of observations in each bucket
-                                                                  -- Array length matches ExplicitBounds length + 1
-    ExplicitBounds Array(Float64) CODEC(ZSTD(1)),              -- Upper bounds for each bucket (e.g., [0.1, 0.5, 1.0, 5.0])
-                                                                  -- Last bucket is implicit (+Inf)
-                                                                  -- Critical for percentile calculations
+    -- ===== HISTOGRAMバケット =====
+    -- 値の頻度を示す実際の分布データ
+    BucketCounts Array(UInt64) CODEC(ZSTD(1)),                 -- 各バケットでの観測数
+                                                                  -- 配列長はExplicitBounds長 + 1と一致
+    ExplicitBounds Array(Float64) CODEC(ZSTD(1)),              -- 各バケットの上限（例: [0.1, 0.5, 1.0, 5.0]）
+                                                                  -- 最後のバケットは暗黙的に(+Inf)
+                                                                  -- パーセンタイル計算に重要
     
-    -- ===== EXEMPLARS =====
-    -- Sample traces that contributed to this histogram
-    -- Exemplars help identify specific requests that contributed to latency spikes
+    -- ===== エグゼンプラー =====
+    -- このHistogramに寄与したサンプル トレース
+    -- エグゼンプラーはレイテンシー スパイクに寄与した特定のリクエストの特定に役立つ
     Exemplars Nested (
-        FilteredAttributes Map(LowCardinality(String), String), -- Additional exemplar attributes (user.id, trace.sampled)
-        TimeUnix DateTime64(9),                                  -- When this exemplar was captured
-        Value Float64,                                           -- The actual measured value (e.g., specific latency)
-        SpanId String,                                           -- Span ID of the trace that generated this exemplar
-        TraceId String                                           -- Trace ID for deep-dive analysis
-    ) CODEC(ZSTD(1)),                                           -- Nested type allows multiple exemplars per histogram
+        FilteredAttributes Map(LowCardinality(String), String), -- 追加のエグゼンプラー属性（user.id, trace.sampledなど）
+        TimeUnix DateTime64(9),                                  -- このエグゼンプラーがキャプチャされた時刻
+        Value Float64,                                           -- 実際に測定された値（例: 特定のレイテンシー）
+        SpanId String,                                           -- このエグゼンプラーを生成したトレースのSpan ID
+        TraceId String                                           -- 深掘り分析用のTrace ID
+    ) CODEC(ZSTD(1)),                                           -- Nested型により、1つのHistogramに複数のエグゼンプラーが可能
     
-    -- ===== METADATA AND FLAGS =====
-    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetry data point flags (reserved for future use)
+    -- ===== メタデータとフラグ =====
+    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetryデータポイントフラグ（将来の利用のために予約）
     
-    -- ===== HISTOGRAM EXTENSIONS =====
-    -- Optional fields for enhanced statistical information
-    Min Float64 CODEC(ZSTD(1)),                                 -- Minimum observed value (if available)
-                                                                  -- Useful for understanding distribution spread
-    Max Float64 CODEC(ZSTD(1)),                                 -- Maximum observed value (if available)  
-                                                                  -- Useful for identifying outliers
+    -- ===== HISTOGRAM拡張 =====
+    -- 拡張統計情報のオプション フィールド
+    Min Float64 CODEC(ZSTD(1)),                                 -- 最小観測値（利用可能な場合）
+                                                                  -- 分布の広がりの理解に有用
+    Max Float64 CODEC(ZSTD(1)),                                 -- 最大観測値（利用可能な場合）  
+                                                                  -- 外れ値の特定に有用
     
-    -- ===== AGGREGATION METADATA =====
-    AggregationTemporality Int32 CODEC(ZSTD(1)),               -- How histogram data points are aggregated:
-                                                                  -- 1 = DELTA (buckets represent change since last report)
-                                                                  -- 2 = CUMULATIVE (buckets represent total since start)
+    -- ===== 集約メタデータ =====
+    AggregationTemporality Int32 CODEC(ZSTD(1)),               -- Histogramデータポイントの集約方法:
+                                                                  -- 1 = DELTA（バケットは最後のレポート以降の変化を表す）
+                                                                  -- 2 = CUMULATIVE（バケットは開始以降の合計を表す）
     
-    -- ===== PERFORMANCE INDEXES =====
-    -- Bloom filter indexes for high-speed attribute searches
-    -- Critical for performance when filtering by dimensions/labels
+    -- ===== パフォーマンス インデックス =====
+    -- 高速属性検索のためのBloomフィルタインデックス
+    -- ディメンション/ラベルによるフィルタリングのパフォーマンスに重要
     INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of resource attribute keys
+                                                                  -- リソース属性キーの高速検索
     INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of resource attribute values
+                                                                  -- リソース属性値の高速検索
     INDEX idx_scope_attr_key mapKeys(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of scope attribute keys
+                                                                  -- スコープ属性キーの高速検索
     INDEX idx_scope_attr_value mapValues(ScopeAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of scope attribute values  
+                                                                  -- スコープ属性値の高速検索  
     INDEX idx_attr_key mapKeys(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1,
-                                                                  -- Fast lookup of metric attribute keys (labels)
+                                                                  -- メトリクス属性キー（ラベル）の高速検索
     INDEX idx_attr_value mapValues(Attributes) TYPE bloom_filter(0.01) GRANULARITY 1
-                                                                  -- Fast lookup of metric attribute values (label values)
+                                                                  -- メトリクス属性値（ラベル値）の高速検索
     ) ENGINE = %s
     %s
-    PARTITION BY toDate(TimeUnix)                               -- Daily partitions for efficient data lifecycle management
+    PARTITION BY toDate(TimeUnix)                               -- 効率的なデータライフサイクル管理のための日次パーティション
     ORDER BY (ServiceName, MetricName, Attributes, toUnixTimestamp64Nano(TimeUnix))
-                                                                  -- Optimal sort order for typical histogram queries:
-                                                                  -- 1. Filter by service
-                                                                  -- 2. Filter by metric name (e.g., latency metrics)
-                                                                  -- 3. Filter by dimensions (endpoint, method)
-                                                                  -- 4. Time-based ordering for trend analysis
-    SETTINGS index_granularity=8192, ttl_only_drop_parts = 1   -- Performance tuning:
-                                                                  -- index_granularity: Balance memory vs precision
-                                                                  -- ttl_only_drop_parts: Efficient partition-level TTL
+                                                                  -- 典型的なHistogramクエリに最適化されたソート順序:
+                                                                  -- 1. サービス名でフィルタ
+                                                                  -- 2. メトリクス名でフィルタ（例: レイテンシー メトリクス）
+                                                                  -- 3. ディメンションでフィルタ（endpoint, methodなど）
+                                                                  -- 4. トレンド分析のための時系列順序
+    SETTINGS index_granularity=8192, ttl_only_drop_parts = 1   -- パフォーマンス調整:
+                                                                  -- index_granularity: メモリと精度のバランス調整
+                                                                  -- ttl_only_drop_parts: パーティション レベルの効率的なTTL

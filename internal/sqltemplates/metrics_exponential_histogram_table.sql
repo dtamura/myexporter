@@ -30,74 +30,74 @@ CREATE TABLE IF NOT EXISTS "%s"."%s" %s (
     -- ===== メトリクス ディメンション =====
     -- メトリクス値にコンテキストを提供するラベル/ディメンション
     Attributes Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-                                                                  -- Metric dimensions: method, endpoint, status_code, instance
-                                                                  -- These create the unique time series identity
+                                                                  -- メトリクス ディメンション: method, endpoint, status_code, instance
+                                                                  -- これらがユニークな時系列の識別子を作成する
     
-    -- ===== TEMPORAL FIELDS =====
-    -- Timestamp information for exponential histogram measurements
-    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- When the measurement period started
-                                                                  -- Critical for understanding accumulation window
-    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- Timestamp when this histogram was observed
-                                                                  -- Primary temporal dimension for queries
+    -- ===== 時間フィールド =====
+    -- Exponential Histogram測定のタイムスタンプ情報
+    StartTimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),          -- 測定期間の開始時刻
+                                                                  -- 蓄積ウィンドウの理解に重要
+    TimeUnix DateTime64(9) CODEC(Delta, ZSTD(1)),              -- このHistogramが観測されたタイムスタンプ
+                                                                  -- クエリの主要な時間ディメンション
     
-    -- ===== EXPONENTIAL HISTOGRAM CORE VALUES =====
-    -- Essential summary statistics of the distribution
-    Count UInt64 CODEC(Delta, ZSTD(1)),                        -- Total number of observations in the histogram
-                                                                  -- Delta codec optimal for monotonically increasing counters
-    Sum Float64 CODEC(ZSTD(1)),                                 -- Sum of all observed values
-                                                                  -- Enables calculation of average: Sum/Count
+    -- ===== EXPONENTIAL HISTOGRAM中核値 =====
+    -- 分布の基本統計サマリー
+    Count UInt64 CODEC(Delta, ZSTD(1)),                        -- Histogramでの観測総数
+                                                                  -- Deltaコーデックは単調増加カウンターに最適
+    Sum Float64 CODEC(ZSTD(1)),                                 -- 全観測値の合計
+                                                                  -- 平均の計算が可能: Sum/Count
     
-    -- ===== EXPONENTIAL HISTOGRAM SCALE AND ZERO BUCKET =====
-    -- Core parameters that define the exponential bucket structure
-    Scale Int32 CODEC(ZSTD(1)),                                 -- Scale parameter that determines bucket precision
-                                                                  -- Higher scale = more buckets = better precision
-                                                                  -- Typical range: -10 to +15
-    ZeroCount UInt64 CODEC(ZSTD(1)),                           -- Count of observations that are exactly zero
-                                                                  -- Special bucket for zero values
+    -- ===== EXPONENTIAL HISTOGRAMスケールとゼロバケット =====
+    -- 指数バケット構造を定義する中核パラメータ
+    Scale Int32 CODEC(ZSTD(1)),                                 -- バケット精度を決定するスケール パラメータ
+                                                                  -- 高スケール = より多いバケット = より良い精度
+                                                                  -- 典型的範囲: -10 ～ +15
+    ZeroCount UInt64 CODEC(ZSTD(1)),                           -- 正確にゼロの観測数
+                                                                  -- ゼロ値用の特別なバケット
     
-    -- ===== POSITIVE BUCKETS =====
-    -- Exponentially-sized buckets for positive values
-    PositiveOffset Int32 CODEC(ZSTD(1)),                       -- Offset for the first positive bucket index
-                                                                  -- Allows sparse representation of bucket arrays
-    PositiveBucketCounts Array(UInt64) CODEC(ZSTD(1)),         -- Count of observations in each positive bucket
-                                                                  -- Array is sparse - only non-zero buckets are stored
-                                                                  -- Bucket boundaries: base^(scale) * 2^(offset + i)
+    -- ===== 正のバケット =====
+    -- 正の値に対する指数サイズのバケット
+    PositiveOffset Int32 CODEC(ZSTD(1)),                       -- 最初の正のバケット インデックスのオフセット
+                                                                  -- バケット配列のスパース表現を可能にする
+    PositiveBucketCounts Array(UInt64) CODEC(ZSTD(1)),         -- 各正のバケットでの観測数
+                                                                  -- 配列はスパース - 非ゼロバケットのみが保存される
+                                                                  -- バケット境界: base^(scale) * 2^(offset + i)
     
-    -- ===== NEGATIVE BUCKETS =====  
-    -- Exponentially-sized buckets for negative values
-    NegativeOffset Int32 CODEC(ZSTD(1)),                       -- Offset for the first negative bucket index
-                                                                  -- Symmetric to positive offset
-    NegativeBucketCounts Array(UInt64) CODEC(ZSTD(1)),         -- Count of observations in each negative bucket
-                                                                  -- Handles negative values with same precision as positive
-                                                                  -- Bucket boundaries: -(base^(scale) * 2^(offset + i))
+    -- ===== 負のバケット =====  
+    -- 負の値に対する指数サイズのバケット
+    NegativeOffset Int32 CODEC(ZSTD(1)),                       -- 最初の負のバケット インデックスのオフセット
+                                                                  -- 正のオフセットと対称
+    NegativeBucketCounts Array(UInt64) CODEC(ZSTD(1)),         -- 各負のバケットでの観測数
+                                                                  -- 正の値と同じ精度で負の値を処理
+                                                                  -- バケット境界: -(base^(scale) * 2^(offset + i))
     
-    -- ===== EXEMPLARS =====
-    -- Sample traces that contributed to this exponential histogram
-    -- Exemplars help identify specific requests that contributed to latency patterns
+    -- ===== エグゼンプラー =====
+    -- このExponential Histogramに寄与したサンプル トレース
+    -- エグゼンプラーはレイテンシー パターンに寄与した特定のリクエストの特定に役立つ
     Exemplars Nested (
-        FilteredAttributes Map(LowCardinality(String), String), -- Additional exemplar attributes (user.id, trace.sampled)
-        TimeUnix DateTime64(9),                                  -- When this exemplar was captured
-        Value Float64,                                           -- The actual measured value (e.g., specific latency)
-        SpanId String,                                           -- Span ID of the trace that generated this exemplar
-        TraceId String                                           -- Trace ID for deep-dive analysis
-    ) CODEC(ZSTD(1)),                                           -- Nested type allows multiple exemplars per histogram
+        FilteredAttributes Map(LowCardinality(String), String), -- 追加のエグゼンプラー属性（user.id, trace.sampledなど）
+        TimeUnix DateTime64(9),                                  -- このエグゼンプラーがキャプチャされた時刻
+        Value Float64,                                           -- 実際に測定された値（例: 特定のレイテンシー）
+        SpanId String,                                           -- このエグゼンプラーを生成したトレースのSpan ID
+        TraceId String                                           -- 深掘り分析用のTrace ID
+    ) CODEC(ZSTD(1)),                                           -- Nested型により、1つのHistogramに複数のエグゼンプラーが可能
     
-    -- ===== METADATA AND FLAGS =====
-    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetry data point flags (reserved for future use)
+    -- ===== メタデータとフラグ =====
+    Flags UInt32 CODEC(ZSTD(1)),                               -- OpenTelemetryデータポイントフラグ（将来の利用のために予約）
     
-    -- ===== EXPONENTIAL HISTOGRAM EXTENSIONS =====
-    -- Optional fields for enhanced statistical information  
-    Min Float64 CODEC(ZSTD(1)),                                 -- Minimum observed value (if available)
-                                                                  -- Useful for understanding distribution spread
-    Max Float64 CODEC(ZSTD(1)),                                 -- Maximum observed value (if available)
-                                                                  -- Useful for identifying outliers and range analysis
+    -- ===== EXPONENTIAL HISTOGRAM拡張 =====
+    -- 拡張統計情報のオプション フィールド  
+    Min Float64 CODEC(ZSTD(1)),                                 -- 最小観測値（利用可能な場合）
+                                                                  -- 分布の広がりの理解に有用
+    Max Float64 CODEC(ZSTD(1)),                                 -- 最大観測値（利用可能な場合）
+                                                                  -- 外れ値の特定と範囲分析に有用
     
-    -- ===== AGGREGATION METADATA =====
-    AggregationTemporality Int32 CODEC(ZSTD(1)),               -- How histogram data points are aggregated:
-                                                                  -- 1 = DELTA (buckets represent change since last report)
-                                                                  -- 2 = CUMULATIVE (buckets represent total since start)
+    -- ===== 集約メタデータ =====
+    AggregationTemporality Int32 CODEC(ZSTD(1)),               -- Histogramデータポイントの集約方法:
+                                                                  -- 1 = DELTA（バケットは最後のレポート以降の変化を表す）
+                                                                  -- 2 = CUMULATIVE（バケットは開始以降の合計を表す）
     
-    -- ===== PERFORMANCE INDEXES =====
+    -- ===== パフォーマンス インデックス =====
     -- Bloom filter indexes for high-speed attribute searches
     -- Critical for performance when filtering by dimensions/labels
     INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 1,
